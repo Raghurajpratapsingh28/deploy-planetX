@@ -54,7 +54,6 @@ export function AddPropertyForm() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    const formData = new FormData();
   
     if (Object.keys(propertyData).length === 0) {
       toast({
@@ -67,66 +66,63 @@ export function AddPropertyForm() {
     }
   
     propertyData.role = lookingFor;
-    // formData.append("propertyData", JSON.stringify(propertyData));
-  
-    if (files.images.length > 0) {
-      files.images.forEach((image, index) => {
-        formData.append(`images-${index}`, image);
-      });
-    }
-    const imageResponse = await uploadPropertyImages(formData, files.images.length);
-    console.log("imageResponse: ", imageResponse);
-    const imageResponseData = JSON.parse(imageResponse);
-    if(!imageResponseData.success){
-      toast({
-        title: "Error",
-        description: imageResponseData.error,
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-    const imageURLs = imageResponseData.imageURLs;
-
-    if (files.video) {
-      formData.append(`video`, files.video);
-    }
-    const videoResponse = await uploadPropertyVideo(formData);
-    console.log("videoResponse: ", videoResponse);
-    const videoResponseData = JSON.parse(videoResponse);
-    if(!videoResponseData.success){
-      toast({
-        title: "Error",
-        description: videoResponseData.error,
-        variant: "destructive",
-      });
-    }
-    const videoURL = videoResponseData.videoURL;
-
-
-
-    let token = localStorage.getItem("accessToken");
-    if (!token) {
-      toast({
-        title: "Error",
-        description: "User not authenticated",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-    token = token.replace(/^"|"$/g, "");
-  
-    console.log("Submitting property with data:", propertyData);
-    console.log("FormData entries:");
-    for (let pair of formData.entries()) {
-      console.log(pair[0], pair[1]);
-    }
 
     try {
+      // Upload images one by one
+      const imageURLs = [];
+      for (let i = 0; i < files.images.length; i++) {
+        const singleImageFormData = new FormData();
+        singleImageFormData.append(`images-0`, files.images[i]);
+        const imageResponse = await uploadPropertyImages(singleImageFormData, 1);
+        const imageResponseData = JSON.parse(imageResponse);
+        
+        if (!imageResponseData.success) {
+          toast({
+            title: "Error",
+            description: imageResponseData.error,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        imageURLs.push(imageResponseData.imageURLs[0]);
+      }
+
+      // Upload video if exists
+      let videoURL = null;
+      if (files.video) {
+        const videoFormData = new FormData();
+        videoFormData.append('video', files.video);
+        const videoResponse = await uploadPropertyVideo(videoFormData);
+        const videoResponseData = JSON.parse(videoResponse);
+        
+        if (!videoResponseData.success) {
+          toast({
+            title: "Error",
+            description: videoResponseData.error,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        videoURL = videoResponseData.videoURL;
+      }
+
+      let token = localStorage.getItem("accessToken");
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "User not authenticated",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      token = token.replace(/^"|"$/g, "");
+
       const response = await axios.post(
         `${BACKEND_URL}/properties/add`,
-        {propertyData, images: imageURLs, video: videoURL},
+        { propertyData, images: imageURLs, video: videoURL },
         {
           headers: {
             Authorization: token,
@@ -135,7 +131,7 @@ export function AddPropertyForm() {
         }
       );
   
-    console.log(response.data);
+      console.log(response.data);
 
       toast({
         title: "Success",
