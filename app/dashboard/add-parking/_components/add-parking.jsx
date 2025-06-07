@@ -97,9 +97,40 @@ export function AddPropertyForm() {
       }
       token = token.replace(/^"|"$/g, "");
 
+      // Format the data to match the backend schema exactly
+      const formattedData = {
+        spotNumber: propertyData.spotNumber,
+        city: propertyData.city,
+        state: propertyData.state,
+        locality: propertyData.locality,
+        sublocality: propertyData.sublocality || "",
+        areaNumber: propertyData.areaNumber || "",
+        type: propertyData.type || "standard",
+        isAvailable: propertyData.isAvailable ?? true,
+        hourlyRate: propertyData.hourlyRate,
+        size: propertyData.size || "medium",
+        amenitiesDetails: {
+          securityGuard: propertyData.amenitiesDetails?.securityGuard ?? false,
+          securityCameras: propertyData.amenitiesDetails?.securityCameras ?? false,
+          evCharging: propertyData.amenitiesDetails?.evCharging ?? false,
+          valetService: propertyData.amenitiesDetails?.valetService ?? false,
+          coveredParking: propertyData.amenitiesDetails?.coveredParking ?? false
+        },
+        images: imageURLs,
+        video: videoURL,
+        accessibility: {
+          wheelchairAccessible: propertyData.accessibility?.wheelchairAccessible ?? false,
+          nearEntrance: propertyData.accessibility?.nearEntrance ?? false
+        },
+        coordinates: {
+          latitude: propertyData.coordinates?.latitude || 0,
+          longitude: propertyData.coordinates?.longitude || 0
+        }
+      };
+
       const response = await axios.post(
         `${BACKEND_URL}/Parking/create`,
-        { ...propertyData, images: imageURLs, video: videoURL },
+        formattedData,
         {
           headers: {
             Authorization: token,
@@ -112,7 +143,7 @@ export function AddPropertyForm() {
 
       toast({
         title: "Success",
-        description: "Property added successfully!",
+        description: "Parking spot added successfully!",
         variant: "default",
       });
 
@@ -124,17 +155,37 @@ export function AddPropertyForm() {
       if (error.response) {
         console.error("Response data:", error.response.data);
         console.error("Status code:", error.response.status);
+
+        // Handle duplicate spot number error
+        if (error.response.data?.details?.includes('duplicate key error') && 
+            error.response.data?.details?.includes('spotNumber')) {
+          toast({
+            title: "Error",
+            description: "A parking spot with this spot number already exists. Please use a different spot number.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: error.response.data?.error || "Failed to add parking spot",
+            variant: "destructive",
+          });
+        }
       } else if (error.request) {
         console.error("No response received. Request details:", error.request);
+        toast({
+          title: "Error",
+          description: "No response from server. Please try again later.",
+          variant: "destructive",
+        });
       } else {
         console.error("Error setting up request:", error.message);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        });
       }
-
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to add property",
-        variant: "destructive",
-      });
     } finally {
       setIsSubmitting(false);
     }
